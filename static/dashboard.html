@@ -10,6 +10,7 @@
     <link href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         .xterm-viewport {
             overflow-y: hidden !important;
@@ -59,42 +60,94 @@
         </div>
 
         <!-- Chat View -->
-        <div id="chat-view" class="view-section hidden flex flex-col h-full">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-2xl font-bold">AI Chat</h2>
-                <button onclick="document.getElementById('chat-settings').classList.toggle('hidden')"
-                    class="text-sm bg-gray-700 px-3 py-1 rounded">Settings</button>
-            </div>
+        <div id="chat-view" class="view-section hidden h-full flex overflow-hidden">
 
-            <div id="chat-settings" class="hidden bg-gray-800 p-4 rounded mb-4 border border-gray-700">
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm mb-1">API Key</label>
-                        <input type="password" id="chat-api-key" placeholder="sk-..."
-                            class="w-full bg-gray-700 p-2 rounded border border-gray-600">
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1">Base URL</label>
-                        <input type="text" id="chat-base-url" placeholder="https://api.openai.com/v1"
-                            class="w-full bg-gray-700 p-2 rounded border border-gray-600">
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1">Model</label>
-                        <input type="text" id="chat-model" value="gpt-3.5-turbo"
-                            class="w-full bg-gray-700 p-2 rounded border border-gray-600">
-                    </div>
+            <!-- Sidebar for History -->
+            <div class="w-64 bg-gray-800 border-r border-gray-700 flex flex-col hidden md:flex">
+                <div class="p-4 border-b border-gray-700">
+                    <button onclick="startNewChat()"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded flex items-center justify-center gap-2">
+                        <span>+ New Chat</span>
+                    </button>
+                </div>
+                <div id="history-list" class="flex-grow overflow-y-auto p-2 space-y-2">
+                    <!-- History items -->
                 </div>
             </div>
 
-            <div id="chat-history"
-                class="flex-grow bg-gray-800 rounded p-4 mb-4 overflow-y-auto flex flex-col space-y-2">
-                <!-- Messages go here -->
-            </div>
+            <!-- Main Chat Area -->
+            <div class="flex-grow flex flex-col h-full bg-gray-900 relative">
 
-            <div class="flex space-x-2">
-                <input type="text" id="chat-input" class="flex-grow bg-gray-700 p-2 rounded border border-gray-600"
-                    placeholder="Type a message...">
-                <button onclick="sendMessage()" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700">Send</button>
+                <div class="bg-gray-800 p-4 border-b border-gray-700 flex justify-between items-center shadow-md">
+                    <div class="flex items-center gap-4">
+                        <button onclick="document.querySelector('#chat-view .w-64').classList.toggle('hidden')"
+                            class="md:hidden text-gray-300">
+                            ☰
+                        </button>
+                        <h2 class="text-xl font-bold" id="current-chat-title">New Chat</h2>
+                    </div>
+                    <button onclick="document.getElementById('chat-settings').classList.toggle('hidden')"
+                        class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600 transition">⚙️ Settings</button>
+                </div>
+
+                <!-- Settings Panel (Overlay or integrated) -->
+                <div id="chat-settings"
+                    class="hidden absolute top-14 right-4 z-10 w-96 bg-gray-800 p-4 rounded-lg border border-gray-600 shadow-xl">
+                    <div class="mb-4 border-b border-gray-700 pb-4">
+                        <label class="block text-sm mb-1 text-gray-400">Saved Providers</label>
+                        <div class="flex gap-2">
+                            <select id="saved-providers" onchange="loadSelectedProvider(this.value)"
+                                class="flex-grow bg-gray-700 p-2 rounded border border-gray-600 text-white text-sm">
+                                <option value="">Select a provider...</option>
+                            </select>
+                            <button onclick="saveProvider()"
+                                class="bg-green-600 hover:bg-green-700 text-white px-2 rounded text-xs">Save</button>
+                            <button onclick="deleteProvider()"
+                                class="bg-red-600 hover:bg-red-700 text-white px-2 rounded text-xs">Del</button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs mb-1 text-gray-400">API Key</label>
+                            <input type="password" id="chat-api-key" placeholder="sk-..."
+                                class="w-full bg-gray-700 p-2 rounded border border-gray-600 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs mb-1 text-gray-400">Base URL</label>
+                            <input type="text" id="chat-base-url" placeholder="https://api.openai.com/v1"
+                                class="w-full bg-gray-700 p-2 rounded border border-gray-600 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs mb-1 text-gray-400">Model</label>
+                            <div class="flex gap-2">
+                                <div class="relative flex-grow">
+                                    <input type="text" id="chat-model" value="gpt-3.5-turbo"
+                                        class="w-full bg-gray-700 p-2 rounded border border-gray-600 text-sm"
+                                        list="model-list-suggestions">
+                                    <datalist id="model-list-suggestions"></datalist>
+                                </div>
+                                <button onclick="fetchModels()"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-3 rounded text-xs whitespace-nowrap">Fetch</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="chat-history" class="flex-grow p-4 overflow-y-auto space-y-4">
+                    <!-- Messages go here -->
+                </div>
+
+                <div class="p-4 bg-gray-800 border-t border-gray-700">
+                    <div class="flex space-x-2">
+                        <textarea id="chat-input" rows="1"
+                            class="flex-grow bg-gray-700 p-3 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            placeholder="Type a message (Markdown supported)..."
+                            onkeydown="handleEnter(event)"></textarea>
+                        <button onclick="sendMessage()"
+                            class="bg-blue-600 px-6 rounded-lg hover:bg-blue-700 font-bold">Send</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -106,10 +159,12 @@
     </div>
 
     <script>
+
         let supabase;
         let term;
         let fitAddon;
         let ws;
+        let currentSessionId = null;
 
         async function init() {
             try {
@@ -123,6 +178,7 @@
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) {
                     window.location.href = '/';
+                    return;
                 }
 
                 document.getElementById('logout-btn').addEventListener('click', async () => {
@@ -130,13 +186,436 @@
                     window.location.href = '/';
                 });
 
-                // Init Terminal on first switch
-                // initTerminal(); - called in switchMode
+                // Load initial data
+                loadProviders();
+                await loadChatHistoryList();
 
             } catch (error) {
                 console.error('Error:', error);
-                // window.location.href = '/'; 
             }
+        }
+
+        // View Switching
+        function switchMode(mode) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(mode + '-view').classList.remove('hidden');
+
+            if (mode === 'terminal') {
+                if (!term) initTerminal();
+                setTimeout(() => fitAddon && fitAddon.fit(), 100);
+            }
+        }
+
+        // --- Chat Logic ---
+
+        async function startNewChat() {
+            currentSessionId = null;
+            document.getElementById('current-chat-title').textContent = "New Chat";
+            document.getElementById('chat-history').innerHTML = '';
+            document.getElementById('chat-input').value = '';
+            // Close sidebar on mobile
+            if (window.innerWidth < 768) {
+                document.querySelector('#chat-view .w-64').classList.add('hidden');
+            }
+        }
+
+        async function loadChatHistoryList() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from('chat_sessions')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Error loading history:', error);
+                return;
+            }
+
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+
+            if (data && data.length > 0) {
+                data.forEach(session => {
+                    const btn = document.createElement('button');
+                    btn.className = "w-full text-left p-2 hover:bg-gray-700 rounded text-gray-300 text-sm truncate relative group";
+                    btn.innerHTML = `
+                         <span onclick="loadChatSession('${session.id}', '${session.title.replace(/'/g, "\\'")}')">${session.title || 'Untitled Chat'}</span>
+                         <span onclick="deleteChat('${session.id}', event)" class="absolute right-2 top-2 hidden group-hover:inline text-red-500 hover:text-red-400 cursor-pointer font-bold">×</span>
+                    `;
+                    list.appendChild(btn);
+                });
+            } else {
+                list.innerHTML = '<div class="text-gray-500 text-xs text-center mt-4">No history</div>';
+            }
+        }
+
+        async function loadChatSession(sessionId, title) {
+            currentSessionId = sessionId;
+            document.getElementById('current-chat-title').textContent = title;
+            document.getElementById('chat-history').innerHTML = '<div class="text-center text-gray-500 mt-4">Loading...</div>';
+
+            // Close sidebar on mobile
+            if (window.innerWidth < 768) {
+                document.querySelector('#chat-view .w-64').classList.add('hidden');
+            }
+
+            const { data, error } = await supabase
+                .from('chat_messages')
+                .select('*')
+                .eq('session_id', sessionId)
+                .order('created_at', { ascending: true });
+
+            const historyContainer = document.getElementById('chat-history');
+            historyContainer.innerHTML = '';
+
+            if (error) {
+                console.error('Error loading messages:', error);
+                return;
+            }
+
+            data.forEach(msg => {
+                addMessageToUI(msg.role === 'user' ? 'user' : 'assistant', msg.content);
+            });
+            scrollToBottom();
+        }
+
+        async function deleteChat(sessionId, event) {
+            event.stopPropagation();
+            if (!confirm("Delete this chat?")) return;
+
+            const { error } = await supabase.from('chat_sessions').delete().eq('id', sessionId);
+            if (error) {
+                alert("Error deleting chat");
+            } else {
+                if (currentSessionId === sessionId) {
+                    startNewChat();
+                }
+                await loadChatHistoryList();
+            }
+        }
+
+        async function createSessionIfNeeded(firstMessage) {
+            if (!currentSessionId) {
+                const { data: { user } } = await supabase.auth.getUser();
+                const title = firstMessage.substring(0, 30) + (firstMessage.length > 30 ? '...' : '');
+
+                const { data, error } = await supabase
+                    .from('chat_sessions')
+                    .insert({ user_id: user.id, title: title })
+                    .select()
+                    .single();
+
+                if (error) {
+                    console.error('Error creating session:', error);
+                    return null;
+                }
+                currentSessionId = data.id;
+                document.getElementById('current-chat-title').textContent = title;
+                loadChatHistoryList(); // Refresh list to show new chat
+            }
+            return currentSessionId;
+        }
+
+        async function saveMessage(role, content) {
+            if (!currentSessionId) return;
+            await supabase.from('chat_messages').insert({
+                session_id: currentSessionId,
+                role: role,
+                content: content
+            });
+        }
+
+        function handleEnter(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            // 1. UI update
+            input.value = '';
+            addMessageToUI('user', message);
+            scrollToBottom();
+
+            // 2. Ensure Session Exists & Save User Message
+            await createSessionIfNeeded(message);
+            saveMessage('user', message);
+
+            // 3. Prepare implementation
+            const apiKey = document.getElementById('chat-api-key').value;
+            const baseUrl = document.getElementById('chat-base-url').value;
+            const model = document.getElementById('chat-model').value;
+
+            // Construct history for API (could optimize to only send recent context)
+            // For now, let's grab the visible history or just send the new message if we want to be stateless
+            // Ideally we should re-construct the conversation from the UI or DB.
+            // Simplification: Send last 10 messages from UI
+            const messages = [];
+            document.querySelectorAll('.chat-message').forEach(el => {
+                const isUser = el.classList.contains('user-message');
+                // We need to get the raw text, but markdown renders HTML. 
+                // We can store logical history in a variable if needed, or just use innerText
+                messages.push({ role: isUser ? 'user' : 'assistant', content: el.getAttribute('data-raw') || el.innerText });
+            });
+
+            const aiMsgEl = addMessageToUI('assistant', '...');
+            let aiContent = '';
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: messages,
+                        apiKey: apiKey || undefined,
+                        baseUrl: baseUrl || undefined,
+                        model: model
+                    })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                aiMsgEl.innerHTML = ''; // Clear loading dots
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const text = decoder.decode(value);
+                    aiContent += text;
+                    // Render markdown incrementally? No, usually safer to render at end or periodic. 
+                    // But for streaming effect we prefer raw text or simple append.
+                    // Let's render Markdown at the end to avoid flickering, or use a streaming markdown parser.
+                    // For now: update text content then render at end.
+                    aiMsgEl.innerText = aiContent;
+                    scrollToBottom();
+                }
+
+                // Final render
+                aiMsgEl.innerHTML = marked.parse(aiContent);
+                aiMsgEl.setAttribute('data-raw', aiContent);
+
+                // Save AI Message
+                saveMessage('assistant', aiContent);
+
+            } catch (error) {
+                aiMsgEl.textContent = "Error: " + error.message;
+            }
+        }
+
+        function addMessageToUI(role, content) {
+            const div = document.createElement('div');
+            // Use tailwind typography for markdown (prose)
+            div.className = `chat-message ${role === 'user' ? 'user-message bg-blue-600' : 'ai-message bg-gray-700'} max-w-[80%] p-3 rounded-lg my-2 prose prose-invert break-words`;
+
+            if (role === 'user') {
+                div.classList.add('self-end');
+                div.innerText = content; // User input is text, no markdown usually? Or yes? user wants markdown rendering too?
+                div.innerHTML = marked.parse(content);
+            } else {
+                div.classList.add('self-start');
+                div.innerHTML = marked.parse(content);
+            }
+
+            div.setAttribute('data-raw', content);
+            document.getElementById('chat-history').appendChild(div);
+            return div;
+        }
+
+        function scrollToBottom() {
+            const historyContainer = document.getElementById('chat-history');
+            historyContainer.scrollTop = historyContainer.scrollHeight;
+        }
+
+        async function fetchModels() {
+            const apiKey = document.getElementById('chat-api-key').value;
+            const baseUrl = document.getElementById('chat-base-url').value;
+
+            if (!baseUrl) {
+                alert("Please enter a Base URL");
+                return;
+            }
+
+            const btn = document.querySelector('button[onclick="fetchModels()"]');
+            const originalText = btn.innerText;
+            btn.innerText = "Loading...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/proxy/models', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ apiKey, baseUrl })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || "Failed to fetch");
+                }
+
+                const data = await res.json();
+                const datalist = document.getElementById('model-list-suggestions');
+                datalist.innerHTML = '';
+
+                // Handle common OpenAI format { data: [{id: ...}, ...] }
+                const models = data.data || data;
+                if (Array.isArray(models)) {
+                    models.forEach(m => {
+                        const option = document.createElement('option');
+                        option.value = m.id || m;
+                        datalist.appendChild(option);
+                    });
+                    alert(`Fetched ${models.length} models! Click the Model input to see them.`);
+                } else {
+                    alert("Unknown response format: " + JSON.stringify(data).substring(0, 100));
+                }
+
+            } catch (e) {
+                alert("Error: " + e.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // --- Provider Management (LocalStorage) ---
+        function loadProviders() {
+            const select = document.getElementById('saved-providers');
+            const currentSelection = select.value;
+            select.innerHTML = '<option value="">Select a provider...</option>';
+
+            const providers = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+            Object.keys(providers).sort().forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+
+            if (providers[currentSelection]) {
+                select.value = currentSelection;
+            }
+        }
+
+        function saveProvider() {
+            const name = prompt("Enter a name for this provider configuration:");
+            if (!name) return;
+
+            const config = {
+                apiKey: document.getElementById('chat-api-key').value,
+                baseUrl: document.getElementById('chat-base-url').value,
+                model: document.getElementById('chat-model').value
+            };
+
+            const providers = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+            providers[name] = config;
+            localStorage.setItem('chat_providers', JSON.stringify(providers));
+            loadProviders();
+            document.getElementById('saved-providers').value = name;
+        }
+
+        function loadSelectedProvider(name) {
+            if (!name) return;
+            const providers = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+            const config = providers[name];
+            if (config) {
+                document.getElementById('chat-api-key').value = config.apiKey || '';
+                document.getElementById('chat-base-url').value = config.baseUrl || '';
+                document.getElementById('chat-model').value = config.model || '';
+            }
+        }
+
+        function deleteProvider() {
+            const select = document.getElementById('saved-providers');
+            const name = select.value;
+            if (!name) return;
+
+            if (confirm(`Delete provider "${name}"?`)) {
+                const providers = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+                delete providers[name];
+                localStorage.setItem('chat_providers', JSON.stringify(providers));
+                loadProviders();
+                document.getElementById('chat-api-key').value = '';
+                document.getElementById('chat-base-url').value = '';
+                document.getElementById('chat-model').value = '';
+            }
+        }
+
+        // --- Terminal Logic ---
+        function initTerminal() {
+            if (term) return;
+
+            term = new Terminal({
+                cursorBlink: true,
+                theme: { background: '#000000' }
+            });
+            fitAddon = new FitAddon.FitAddon();
+            term.loadAddon(fitAddon);
+            term.open(document.getElementById('terminal-container'));
+            fitAddon.fit();
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws/terminal`);
+
+            ws.onopen = () => {
+                term.write('\r\nConnected to backend terminal...\r\n');
+                const cols = term.cols;
+                const rows = term.rows;
+                ws.send(`\x01resize:${cols}:${rows}`);
+            };
+
+            ws.onmessage = (event) => {
+                term.write(event.data);
+            };
+
+            term.onData(data => {
+                ws.send(data);
+            });
+
+            term.onResize(size => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(`\x01resize:${size.cols}:${size.rows}`);
+                }
+            });
+
+            window.addEventListener('resize', () => {
+                fitAddon.fit();
+            });
+        }
+
+        init();
+        try {
+            const res = await fetch('/config');
+            const config = await res.json();
+            if (!config.supabase_url || !config.supabase_key) {
+                throw new Error('Supabase configuration missing');
+            }
+            supabase = window.supabase.createClient(config.supabase_url, config.supabase_key);
+
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                window.location.href = '/';
+            }
+
+            document.getElementById('logout-btn').addEventListener('click', async () => {
+                await supabase.auth.signOut();
+                window.location.href = '/';
+            });
+
+            // Init Terminal on first switch
+            // initTerminal(); - called in switchMode
+
+        } catch (error) {
+            console.error('Error:', error);
+            // window.location.href = '/'; 
+        }
         }
 
         // View Switching
@@ -260,6 +739,76 @@
                 fitAddon.fit();
             });
         }
+
+        // --- Provider Management ---
+        function loadProviders() {
+            const select = document.getElementById('saved-providers');
+            const currentSelection = select.value;
+            select.innerHTML = '<option value="">Select a provider...</option>';
+
+            const providers = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+            Object.keys(providers).sort().forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+
+            if (providers[currentSelection]) {
+                select.value = currentSelection;
+            }
+        }
+
+        function saveProvider() {
+            const name = prompt("Enter a name for this provider configuration:");
+            if (!name) return;
+
+            const config = {
+                apiKey: document.getElementById('chat-api-key').value,
+                baseUrl: document.getElementById('chat-base-url').value,
+                model: document.getElementById('chat-model').value
+            };
+
+            const providers = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+            providers[name] = config;
+            localStorage.setItem('chat_providers', JSON.stringify(providers));
+            loadProviders();
+            document.getElementById('saved-providers').value = name;
+        }
+
+        function loadSelectedProvider(name) {
+            if (!name) return;
+            const providers = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+            const config = providers[name];
+            if (config) {
+                document.getElementById('chat-api-key').value = config.apiKey || '';
+                document.getElementById('chat-base-url').value = config.baseUrl || '';
+                document.getElementById('chat-model').value = config.model || '';
+            }
+        }
+
+        function deleteProvider() {
+            const select = document.getElementById('saved-providers');
+            const name = select.value;
+            if (!name) {
+                alert("Please select a provider to delete.");
+                return;
+            }
+
+            if (confirm(`Are you sure you want to delete "${name}"?`)) {
+                const providers = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+                delete providers[name];
+                localStorage.setItem('chat_providers', JSON.stringify(providers));
+                loadProviders();
+                // Clear fields
+                document.getElementById('chat-api-key').value = '';
+                document.getElementById('chat-base-url').value = '';
+                document.getElementById('chat-model').value = '';
+            }
+        }
+
+        // Initialize providers on load
+        loadProviders();
 
         init();
     </script>

@@ -81,7 +81,45 @@ async def chat_endpoint(request: ChatRequest):
 
     return StreamingResponse(generate(), media_type="text/plain")
 
-# --- Terminal Implementation ---
+class ModelsRequest(BaseModel):
+    apiKey: Optional[str] = None
+    baseUrl: Optional[str] = None
+
+@app.post("/api/proxy/models")
+async def proxy_models(request: ModelsRequest):
+    api_key = request.apiKey or os.environ.get("OPENAI_API_KEY")
+    base_url = request.baseUrl or os.environ.get("OPENAI_BASE_URL")
+    
+    if not base_url:
+        raise HTTPException(status_code=400, detail="Base URL is required")
+
+    # Cleanup base_url to ensure it doesn't end with /v1 if we need to hit models, 
+    # but OpenAI client usually handles simple /models on top of base.
+    # Actually, standard OpenAI client usage: client = OpenAI(base_url=...) -> client.models.list()
+    
+    try:
+        # Use simple HTTP request to avoid instantiating full client if just checking models
+        # Or use the OpenAI client which handles it well.
+        import httpx
+        
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        
+        # Ensure base_url ends correctly for appending /models.
+        # If base_url is ".../v1", models endpoint is usually ".../v1/models"
+        target_url = f"{base_url.rstrip('/')}/models"
+        
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(target_url, headers=headers, timeout=10.0)
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail=f"Provider returned error: {resp.text}")
+            return resp.json()
+            
+    except Exception as e:
+        print(f"Error fetching models: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.websocket("/ws/terminal")
 async def websocket_terminal(websocket: WebSocket):

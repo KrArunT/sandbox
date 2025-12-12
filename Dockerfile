@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
 
 # Install uv (specific version 0.9.17)
 RUN curl -LsSf https://astral.sh/uv/0.9.17/install.sh | sh
-ENV PATH="/root/.cargo/bin:$PATH"
+ENV PATH="/root/.local/bin:$PATH"
 
 # Install nvm and Node.js v24
 ENV NVM_DIR="/root/.nvm"

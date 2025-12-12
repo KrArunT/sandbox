@@ -11,7 +11,7 @@ api.create_repo(
     repo_id=repo_id,
     repo_type="space",
     exist_ok=True,
-    space_sdk="static"
+    space_sdk="docker"
 )
 
 # Upload the folder

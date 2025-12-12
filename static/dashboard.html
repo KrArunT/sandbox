@@ -451,14 +451,6 @@
         });
 
         // --- Chat Logic ---
-        const providers = JSON.parse(localStorage.getItem('chat_providers') || '{}');
-        delete providers[name];
-        localStorage.setItem('chat_providers', JSON.stringify(providers));
-        loadProviders();
-        document.getElementById('chat-api-key').value = '';
-        document.getElementById('chat-base-url').value = '';
-        document.getElementById('chat-model').value = '';
-            }
         }
 
         // --- Chat Logic (Restored) ---
@@ -665,57 +657,6 @@
             }
         }
 
-        // --- Terminal Tabs Logic ---
-        function createTerminalTab() {
-            terminalCount++;
-            const id = 'term-' + terminalCount;
-
-            // 1. Create Container
-            const container = document.createElement('div');
-            container.id = id;
-            container.className = 'absolute top-0 left-0 w-full h-full hidden'; // Hidden by default
-            document.getElementById('terminals-container').appendChild(container);
-
-            // 2. Create Instance
-            const term = new Terminal({
-                cursorBlink: true,
-                theme: { background: '#000000', foreground: '#f0f0f0' },
-                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-                fontSize: 14
-            });
-            const fitAddon = new FitAddon.FitAddon();
-            term.loadAddon(fitAddon);
-            term.open(document.getElementById('terminal-container'));
-            fitAddon.fit();
-
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            ws = new WebSocket(`${protocol}//${window.location.host}/ws/terminal`);
-
-            ws.onopen = () => {
-                term.write('\r\nConnected to backend terminal...\r\n');
-                const cols = term.cols;
-                const rows = term.rows;
-                ws.send(`\x01resize:${cols}:${rows}`);
-            };
-
-            ws.onmessage = (event) => {
-                term.write(event.data);
-            };
-
-            term.onData(data => {
-                ws.send(data);
-            });
-
-            term.onResize(size => {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(`\x01resize:${size.cols}:${size.rows}`);
-                }
-            });
-
-            window.addEventListener('resize', () => {
-                fitAddon.fit();
-            });
-        }
 
         init();
     </script>

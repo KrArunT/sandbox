@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Sandbox</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
@@ -38,172 +38,243 @@
     </style>
 </head>
 
-<body class="bg-gray-900 text-white min-h-screen flex flex-col">
-    <nav class="bg-gray-800 p-4 shrink-0">
-        <div class="container mx-auto flex justify-between items-center">
-            <div class="text-xl font-bold text-blue-500">Sandbox App</div>
-            <div class="flex space-x-4">
-                <button onclick="switchMode('dashboard')" class="text-gray-300 hover:text-white">Dashboard</button>
-                <button onclick="switchMode('chat')" class="text-gray-300 hover:text-white">AI Chat</button>
-                <button onclick="switchMode('terminal')" class="text-gray-300 hover:text-white">Terminal</button>
+<body class="bg-gray-900 text-white h-screen flex flex-col overflow-hidden">
+    <!-- Navbar -->
+    <nav class="bg-gray-800 border-b border-gray-700 shrink-0">
+        <div class="px-4 py-3 flex justify-between items-center">
+            <div class="text-xl font-bold text-blue-500 flex items-center gap-2">
+                <span class="md:hidden cursor-pointer text-gray-400"
+                    onclick="document.getElementById('mobile-menu').classList.toggle('hidden')">☰</span>
+                Sandbox
             </div>
-            <button id="logout-btn" class="px-4 py-2 bg-red-600 rounded hover:bg-red-700">Logout</button>
+            <div class="hidden md:flex space-x-1">
+                <button onclick="switchMode('dashboard')"
+                    class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition"
+                    id="nav-dashboard">Dashboard</button>
+                <button onclick="switchMode('chat')"
+                    class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition" id="nav-chat">AI Chat</button>
+                <button onclick="switchMode('terminal')"
+                    class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition"
+                    id="nav-terminal">Terminal</button>
+            </div>
+            <button id="logout-btn"
+                class="px-3 py-1 bg-red-600 rounded hover:bg-red-700 text-sm font-medium transition">Logout</button>
+        </div>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-gray-800 border-t border-gray-700 p-2 space-y-1">
+            <button onclick="switchMode('dashboard')"
+                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">Dashboard</button>
+            <button onclick="switchMode('chat')"
+                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">AI Chat</button>
+            <button onclick="switchMode('terminal')"
+                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">Terminal</button>
         </div>
     </nav>
 
-    <div class="container mx-auto mt-4 p-4 flex-grow flex flex-col h-[calc(100vh-80px)] overflow-hidden">
+    <!-- Main Content Area (Full Screen) -->
+    <div class="flex-grow relative overflow-hidden">
 
         <!-- Dashboard View -->
-        <div id="dashboard-view" class="view-section">
-            <h1 class="text-3xl font-bold mb-4">Welcome to the Dashboard</h1>
-            <p class="text-gray-400">Select AI Chat or Terminal from the navigation bar.</p>
+        <div id="dashboard-view"
+            class="view-section w-full h-full flex flex-col items-center justify-center p-8 text-center">
+            <h1
+                class="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                Welcome to Sandbox</h1>
+            <p class="text-gray-400 max-w-md mx-auto mb-8">Your AI-powered development environment. Access the Chat for
+                coding assistance or the Terminal for execution.</p>
+            <div class="flex gap-4">
+                <button onclick="switchMode('chat')"
+                    class="px-6 py-3 bg-blue-600 rounded-lg hover:bg-blue-700 font-semibold transition">Open AI
+                    Chat</button>
+                <button onclick="switchMode('terminal')"
+                    class="px-6 py-3 bg-gray-700 rounded-lg hover:bg-gray-600 font-semibold transition">Open
+                    Terminal</button>
+            </div>
         </div>
 
         <!-- Chat View -->
-        <div id="chat-view" class="view-section hidden h-full flex overflow-hidden">
-
-            <!-- Sidebar for History -->
-            <div class="w-64 bg-gray-800 border-r border-gray-700 flex flex-col hidden md:flex">
-                <div class="p-4 border-b border-gray-700">
+        <div id="chat-view" class="view-section hidden w-full h-full flex overflow-hidden">
+            <!-- Sidebar for History (Desktop) -->
+            <div class="w-64 bg-gray-800 border-r border-gray-700 flex flex-col hidden md:flex shrink-0">
+                <div class="p-3 border-b border-gray-700">
                     <button onclick="startNewChat()"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded flex items-center justify-center gap-2">
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded flex items-center justify-center gap-2 text-sm font-medium transition">
                         <span>+ New Chat</span>
                     </button>
                 </div>
-                <div id="history-list" class="flex-grow overflow-y-auto p-2 space-y-2">
-                    <!-- History items -->
-                </div>
+                <div id="history-list" class="flex-grow overflow-y-auto p-2 space-y-1"></div>
             </div>
 
-            <!-- Main Chat Area -->
-            <div class="flex-grow flex flex-col h-full bg-gray-900 relative">
-
-                <div class="bg-gray-800 p-4 border-b border-gray-700 flex justify-between items-center shadow-md">
-                    <div class="flex items-center gap-4">
+            <!-- Chat Area -->
+            <div class="flex-grow flex flex-col h-full bg-gray-900 relative min-w-0">
+                <!-- Header -->
+                <div
+                    class="bg-gray-800 p-3 border-b border-gray-700 flex justify-between items-center shadow-sm shrink-0">
+                    <div class="flex items-center gap-3 overflow-hidden">
                         <button onclick="document.querySelector('#chat-view .w-64').classList.toggle('hidden')"
-                            class="md:hidden text-gray-300">
-                            ☰
+                            class="md:hidden text-gray-400 p-1">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 6h16M4 12h16M4 18h16"></path>
+                            </svg>
                         </button>
-                        <h2 class="text-xl font-bold" id="current-chat-title">New Chat</h2>
+                        <h2 class="text-lg font-semibold truncate" id="current-chat-title">New Chat</h2>
                     </div>
-                    <button onclick="document.getElementById('chat-settings').classList.toggle('hidden')"
-                        class="text-sm bg-gray-700 px-3 py-1 rounded hover:bg-gray-600 transition">⚙️ Settings</button>
+                    <button onclick="toggleSettings()"
+                        class="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700 transition">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                            </path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </button>
                 </div>
 
-                <!-- Settings Panel (Overlay or integrated) -->
+                <!-- Settings Modal (Overlay) -->
                 <div id="chat-settings"
-                    class="hidden absolute top-14 right-4 z-10 w-96 bg-gray-800 p-4 rounded-lg border border-gray-600 shadow-xl">
-                    <div class="mb-4 border-b border-gray-700 pb-4">
-                        <label class="block text-sm mb-1 text-gray-400">Saved Providers</label>
-                        <div class="flex gap-2">
-                            <select id="saved-providers" onchange="loadSelectedProvider(this.value)"
-                                class="flex-grow bg-gray-700 p-2 rounded border border-gray-600 text-white text-sm">
-                                <option value="">Select a provider...</option>
-                            </select>
-                            <button onclick="saveProvider()"
-                                class="bg-green-600 hover:bg-green-700 text-white px-2 rounded text-xs">Save</button>
-                            <button onclick="deleteProvider()"
-                                class="bg-red-600 hover:bg-red-700 text-white px-2 rounded text-xs">Del</button>
-                        </div>
+                    class="hidden absolute top-14 right-4 z-20 w-80 md:w-96 bg-gray-800 p-4 rounded-xl border border-gray-600 shadow-2xl">
+                    <div class="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+                        <h3 class="font-bold text-gray-200">Settings</h3>
+                        <button onclick="toggleSettings()" class="text-gray-400 hover:text-white">&times;</button>
                     </div>
-
+                    <!-- Settings Form (Same as before but tighter) -->
                     <div class="space-y-3">
                         <div>
-                            <label class="block text-xs mb-1 text-gray-400">API Key</label>
-                            <input type="password" id="chat-api-key" placeholder="sk-..."
-                                class="w-full bg-gray-700 p-2 rounded border border-gray-600 text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs mb-1 text-gray-400">Base URL</label>
-                            <input type="text" id="chat-base-url" placeholder="https://api.openai.com/v1"
-                                class="w-full bg-gray-700 p-2 rounded border border-gray-600 text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs mb-1 text-gray-400">Model</label>
+                            <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Saved
+                                Providers</label>
                             <div class="flex gap-2">
-                                <div class="relative flex-grow">
+                                <select id="saved-providers" onchange="loadSelectedProvider(this.value)"
+                                    class="flex-grow bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500">
+                                    <option value="">Select...</option>
+                                </select>
+                                <button onclick="saveProvider()"
+                                    class="bg-green-600 hover:bg-green-700 text-white px-2 rounded text-xs">Save</button>
+                                <button onclick="deleteProvider()"
+                                    class="bg-red-600 hover:bg-red-700 text-white px-2 rounded text-xs">Del</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">API Key</label>
+                            <input type="password" id="chat-api-key" placeholder="sk-..."
+                                class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Base URL</label>
+                                <input type="text" id="chat-base-url" placeholder="https://api..."
+                                    class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Model</label>
+                                <div class="flex gap-1">
                                     <input type="text" id="chat-model" value="gpt-3.5-turbo"
-                                        class="w-full bg-gray-700 p-2 rounded border border-gray-600 text-sm"
-                                        list="model-list-suggestions">
-                                    <datalist id="model-list-suggestions"></datalist>
+                                        class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500"
+                                        list="model-list">
+                                    <datalist id="model-list"></datalist>
+                                    <button onclick="fetchModels()"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-2 rounded text-xs">↻</button>
                                 </div>
-                                <button onclick="fetchModels()"
-                                    class="bg-blue-600 hover:bg-blue-700 text-white px-3 rounded text-xs whitespace-nowrap">Fetch</button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div id="chat-history" class="flex-grow p-4 overflow-y-auto space-y-4">
-                    <!-- Messages go here -->
-                </div>
+                <!-- Messages -->
+                <div id="chat-history" class="flex-grow p-4 overflow-y-auto space-y-4 scroll-smooth"></div>
 
-                <div class="p-4 bg-gray-800 border-t border-gray-700">
-                    <div class="flex space-x-2">
+                <!-- Input -->
+                <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
+                    <div class="flex space-x-2 max-w-4xl mx-auto">
                         <textarea id="chat-input" rows="1"
-                            class="flex-grow bg-gray-700 p-3 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            placeholder="Type a message (Markdown supported)..."
+                            class="flex-grow bg-gray-700 p-3 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
+                            placeholder="Message..."
+                            oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
                             onkeydown="handleEnter(event)"></textarea>
                         <button onclick="sendMessage()"
-                            class="bg-blue-600 px-6 rounded-lg hover:bg-blue-700 font-bold">Send</button>
+                            class="bg-blue-600 px-4 rounded-lg hover:bg-blue-700 font-bold transition flex items-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                            </svg>
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Terminal View -->
-        <div id="terminal-view" class="view-section hidden h-full bg-black rounded p-2 overflow-hidden">
-            <div id="terminal-container" class="w-full h-full"></div>
+        <!-- Terminal View (Multi-Tab) -->
+        <div id="terminal-view" class="view-section hidden w-full h-full flex flex-col overflow-hidden bg-black">
+            <!-- Tabs Bar -->
+            <div class="flex items-center bg-gray-800 border-b border-gray-700 shrink-0 overflow-x-auto">
+                <div id="terminal-tabs" class="flex">
+                    <!-- Tab Items will be injected here -->
+                </div>
+                <button onclick="createTerminalTab()"
+                    class="px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-700 transition font-bold"
+                    title="New Terminal">
+                    +
+                </button>
+            </div>
+            <!-- Terminal Containers Area -->
+            <div id="terminals-container" class="flex-grow relative w-full h-full">
+                <!-- Individual terminal viewports go here -->
+            </div>
         </div>
 
     </div>
 
     <script>
-
         let supabase;
-        let term;
-        let fitAddon;
-        let ws;
-        let currentSessionId = null;
+        // --- Multi-Terminal Logic ---
+        let terminals = {}; // { id: { term, fitAddon, ws, containerId } }
+        let activeTerminalId = null;
+        let terminalCount = 0;
+
+        function toggleSettings() {
+            document.getElementById('chat-settings').classList.toggle('hidden');
+        }
 
         async function init() {
             try {
                 const res = await fetch('/config');
                 const config = await res.json();
-                if (!config.supabase_url || !config.supabase_key) {
-                    throw new Error('Supabase configuration missing');
-                }
+                if (!config.supabase_url || !config.supabase_key) throw new Error('Supabase Config Missing');
                 supabase = window.supabase.createClient(config.supabase_url, config.supabase_key);
 
                 const { data: { session } } = await supabase.auth.getSession();
-                if (!session) {
-                    window.location.href = '/';
-                    return;
-                }
+                if (!session) { window.location.href = '/'; return; }
 
                 document.getElementById('logout-btn').addEventListener('click', async () => {
                     await supabase.auth.signOut();
                     window.location.href = '/';
                 });
 
-                // Load initial data
                 loadProviders();
                 await loadChatHistoryList();
 
-            } catch (error) {
-                console.error('Error:', error);
-            }
+                // Create first terminal tab by default
+                createTerminalTab();
+
+            } catch (error) { console.error(error); }
         }
 
-        // View Switching
+        // --- View Switching ---
         function switchMode(mode) {
             document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
             document.getElementById(mode + '-view').classList.remove('hidden');
 
-            if (mode === 'terminal') {
-                if (!term) initTerminal();
-                setTimeout(() => fitAddon && fitAddon.fit(), 100);
+            // Highlight nav
+            document.querySelectorAll('nav button[id^="nav-"]').forEach(b => b.classList.remove('bg-gray-700', 'text-white'));
+            const navBtn = document.getElementById('nav-' + mode);
+            if (navBtn) navBtn.classList.add('bg-gray-700', 'text-white');
+
+            if (mode === 'terminal' && activeTerminalId) {
+                setTimeout(() => fitTerm(activeTerminalId), 100);
             }
+            // Close mobile menu
+            document.getElementById('mobile-menu').classList.add('hidden');
         }
 
         // --- Chat Logic ---
@@ -461,7 +532,7 @@
                 }
 
                 const data = await res.json();
-                const datalist = document.getElementById('model-list-suggestions');
+                const datalist = document.getElementById('model-list'); // Changed from model-list-suggestions
                 datalist.innerHTML = '';
 
                 // Handle common OpenAI format { data: [{id: ...}, ...] }
@@ -548,15 +619,229 @@
             }
         }
 
-        // --- Terminal Logic ---
-        function initTerminal() {
-            if (term) return;
+        // --- Chat Logic (Restored) ---
+        let chatHistory = [];
+        let currentSessionId = null;
 
-            term = new Terminal({
-                cursorBlink: true,
-                theme: { background: '#000000' }
+        async function startNewChat() {
+            currentSessionId = null;
+            chatHistory = [];
+            document.getElementById('current-chat-title').textContent = "New Chat";
+            document.getElementById('chat-history').innerHTML = '';
+            document.getElementById('chat-input').value = '';
+            if (window.innerWidth < 768) {
+                document.querySelector('#chat-view .w-64').classList.add('hidden');
+            }
+        }
+
+        async function loadChatHistoryList() {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            const { data, error } = await supabase.from('chat_sessions').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+            if (error) return console.error(error);
+
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+            if (data && data.length > 0) {
+                data.forEach(session => {
+                    const btn = document.createElement('button');
+                    btn.className = "w-full text-left p-2 hover:bg-gray-700 rounded text-gray-300 text-sm truncate relative group mb-1";
+                    btn.innerHTML = `<span onclick="loadChatSession('${session.id}', '${session.title.replace(/'/g, "\\'")}')">${session.title || 'Untitled'}</span>`;
+                    list.appendChild(btn);
+                });
+            }
+        }
+
+        async function loadChatSession(sessionId, title) {
+            currentSessionId = sessionId;
+            document.getElementById('current-chat-title').textContent = title;
+            document.getElementById('chat-history').innerHTML = '<div class="text-center text-gray-500 mt-4">Loading...</div>';
+            if (window.innerWidth < 768) document.querySelector('#chat-view .w-64').classList.add('hidden');
+
+            const { data } = await supabase.from('chat_messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true });
+            document.getElementById('chat-history').innerHTML = '';
+            chatHistory = [];
+            if (data) {
+                data.forEach(msg => {
+                    addMessageToUI(msg.role === 'user' ? 'user' : 'assistant', msg.content);
+                    chatHistory.push({ role: msg.role, content: msg.content });
+                });
+                scrollToBottom();
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            addMessageToUI('user', message);
+            chatHistory.push({ role: 'user', content: message });
+            input.value = '';
+            scrollToBottom();
+
+            // Save to DB
+            if (!currentSessionId) {
+                const { data: { user } } = await supabase.auth.getUser();
+                const { data } = await supabase.from('chat_sessions').insert({ user_id: user.id, title: message.substring(0, 30) }).select().single();
+                if (data) {
+                    currentSessionId = data.id;
+                    loadChatHistoryList();
+                }
+            }
+            if (currentSessionId) await supabase.from('chat_messages').insert({ session_id: currentSessionId, role: 'user', content: message });
+
+            // AI Request
+            const apiKey = document.getElementById('chat-api-key').value;
+            const baseUrl = document.getElementById('chat-base-url').value;
+            const model = document.getElementById('chat-model').value;
+            const aiMsgEl = addMessageToUI('assistant', '...');
+            let aiContent = '';
+
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages: chatHistory, apiKey, baseUrl, model })
+                });
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                aiMsgEl.innerHTML = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    aiContent += decoder.decode(value);
+                    aiMsgEl.innerText = aiContent; // Simple stream render
+                    scrollToBottom();
+                }
+                // Final Markdown
+                aiMsgEl.innerHTML = marked.parse(aiContent);
+
+                chatHistory.push({ role: 'assistant', content: aiContent });
+                if (currentSessionId) await supabase.from('chat_messages').insert({ session_id: currentSessionId, role: 'assistant', content: aiContent });
+
+            } catch (error) {
+                aiMsgEl.textContent = "Error: " + error.message;
+            }
+        }
+
+        function addMessageToUI(role, content) {
+            const div = document.createElement('div');
+            div.className = `chat-message ${role === 'user' ? 'user-message bg-blue-600 self-end' : 'ai-message bg-gray-700 self-start'} max-w-[85%] p-3 rounded-xl my-2 prose prose-invert break-words text-sm md:text-base shadow-sm`;
+            div.innerHTML = marked.parse(content);
+            document.getElementById('chat-history').appendChild(div);
+            return div;
+        }
+
+        function scrollToBottom() {
+            const container = document.getElementById('chat-history');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function handleEnter(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // --- Provider & Models (Restored) ---
+        // (Assuming existing loadProviders/saveProvider/deleteProvider/fetchModels are preserved or need re-insertion if overwritten. 
+        //  The previous replacement block was huge, let's verify if they were cut off. 
+        //  Actually, the replacement block ended at `// ... [Include Chat/Provider JS here]`. 
+        //  So I must re-add them now.)
+
+        async function fetchModels() { /* ... same as before ... */
+            const apiKey = document.getElementById('chat-api-key').value;
+            const baseUrl = document.getElementById('chat-base-url').value;
+            if (!baseUrl) return alert("Base URL required");
+
+            try {
+                const res = await fetch('/api/proxy/models', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey, baseUrl }) });
+                const data = await res.json();
+                const list = document.getElementById('model-list');
+                list.innerHTML = '';
+                const models = data.data || data;
+                if (Array.isArray(models)) {
+                    models.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m.id || m;
+                        list.appendChild(opt);
+                    });
+                    alert(`Fetched ${models.length} models.`);
+                }
+            } catch (e) { alert(e.message); }
+        }
+
+        function loadProviders() {
+            const select = document.getElementById('saved-providers');
+            const saved = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+            select.innerHTML = '<option value="">Select...</option>';
+            Object.keys(saved).forEach(k => {
+                const opt = document.createElement('option');
+                opt.value = k;
+                opt.innerText = k;
+                select.appendChild(opt);
             });
-            fitAddon = new FitAddon.FitAddon();
+        }
+
+        function saveProvider() {
+            const name = prompt("Name:");
+            if (!name) return;
+            const config = {
+                apiKey: document.getElementById('chat-api-key').value,
+                baseUrl: document.getElementById('chat-base-url').value,
+                model: document.getElementById('chat-model').value
+            };
+            const saved = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+            saved[name] = config;
+            localStorage.setItem('chat_providers', JSON.stringify(saved));
+            loadProviders();
+            document.getElementById('saved-providers').value = name;
+        }
+
+        function deleteProvider() {
+            const name = document.getElementById('saved-providers').value;
+            if (!name) return;
+            if (!confirm("Delete?")) return;
+            const saved = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+            delete saved[name];
+            localStorage.setItem('chat_providers', JSON.stringify(saved));
+            loadProviders();
+        }
+
+        function loadSelectedProvider(name) {
+            if (!name) return;
+            const saved = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+            const config = saved[name];
+            if (config) {
+                document.getElementById('chat-api-key').value = config.apiKey;
+                document.getElementById('chat-base-url').value = config.baseUrl;
+                document.getElementById('chat-model').value = config.model;
+            }
+        }
+
+        // --- Terminal Tabs Logic ---
+        function createTerminalTab() {
+            terminalCount++;
+            const id = 'term-' + terminalCount;
+
+            // 1. Create Container
+            const container = document.createElement('div');
+            container.id = id;
+            container.className = 'absolute top-0 left-0 w-full h-full hidden'; // Hidden by default
+            document.getElementById('terminals-container').appendChild(container);
+
+            // 2. Create Instance
+            const term = new Terminal({
+                cursorBlink: true,
+                theme: { background: '#000000', foreground: '#f0f0f0' },
+                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                fontSize: 14
+            });
+            const fitAddon = new FitAddon.FitAddon();
             term.loadAddon(fitAddon);
             term.open(document.getElementById('terminal-container'));
             fitAddon.fit();

@@ -11,7 +11,69 @@
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <!-- Highlight.js -->
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
     <style>
+        .view-section {
+            transition: opacity 0.2s;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            bg: #1f2937;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+
+        .katex {
+            font-size: 1.1em;
+        }
+
+        .chat-message pre {
+            margin: 0;
+            padding: 0.5rem;
+            background: #1a1b26;
+            border-radius: 0.5rem;
+            position: relative;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: #374151;
+            color: white;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 0.75rem;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .chat-message pre:hover .copy-btn {
+            opacity: 1;
+        }
+
         .xterm-viewport {
             overflow-y: hidden !important;
         }
@@ -253,9 +315,7 @@
 
                 loadProviders();
                 await loadChatHistoryList();
-
-                // Create first terminal tab by default
-                createTerminalTab();
+                createTerminalTab(); // Init first tab
 
             } catch (error) { console.error(error); }
         }
@@ -265,7 +325,6 @@
             document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
             document.getElementById(mode + '-view').classList.remove('hidden');
 
-            // Highlight nav
             document.querySelectorAll('nav button[id^="nav-"]').forEach(b => b.classList.remove('bg-gray-700', 'text-white'));
             const navBtn = document.getElementById('nav-' + mode);
             if (navBtn) navBtn.classList.add('bg-gray-700', 'text-white');
@@ -273,349 +332,132 @@
             if (mode === 'terminal' && activeTerminalId) {
                 setTimeout(() => fitTerm(activeTerminalId), 100);
             }
-            // Close mobile menu
             document.getElementById('mobile-menu').classList.add('hidden');
         }
 
-        // --- Chat Logic ---
+        // --- Terminal Tabs Logic ---
+        function createTerminalTab() {
+            terminalCount++;
+            const id = 'term-' + terminalCount;
 
-        async function startNewChat() {
-            currentSessionId = null;
-            document.getElementById('current-chat-title').textContent = "New Chat";
-            document.getElementById('chat-history').innerHTML = '';
-            document.getElementById('chat-input').value = '';
-            // Close sidebar on mobile
-            if (window.innerWidth < 768) {
-                document.querySelector('#chat-view .w-64').classList.add('hidden');
-            }
-        }
+            // 1. Create Container
+            const container = document.createElement('div');
+            container.id = id;
+            container.className = 'absolute top-0 left-0 w-full h-full hidden';
+            document.getElementById('terminals-container').appendChild(container);
 
-        async function loadChatHistoryList() {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const { data, error } = await supabase
-                .from('chat_sessions')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('Error loading history:', error);
-                return;
-            }
-
-            const list = document.getElementById('history-list');
-            list.innerHTML = '';
-
-            if (data && data.length > 0) {
-                data.forEach(session => {
-                    const btn = document.createElement('button');
-                    btn.className = "w-full text-left p-2 hover:bg-gray-700 rounded text-gray-300 text-sm truncate relative group";
-                    btn.innerHTML = `
-                         <span onclick="loadChatSession('${session.id}', '${session.title.replace(/'/g, "\\'")}')">${session.title || 'Untitled Chat'}</span>
-                         <span onclick="deleteChat('${session.id}', event)" class="absolute right-2 top-2 hidden group-hover:inline text-red-500 hover:text-red-400 cursor-pointer font-bold">×</span>
-                    `;
-                    list.appendChild(btn);
-                });
-            } else {
-                list.innerHTML = '<div class="text-gray-500 text-xs text-center mt-4">No history</div>';
-            }
-        }
-
-        async function loadChatSession(sessionId, title) {
-            currentSessionId = sessionId;
-            document.getElementById('current-chat-title').textContent = title;
-            document.getElementById('chat-history').innerHTML = '<div class="text-center text-gray-500 mt-4">Loading...</div>';
-
-            // Close sidebar on mobile
-            if (window.innerWidth < 768) {
-                document.querySelector('#chat-view .w-64').classList.add('hidden');
-            }
-
-            const { data, error } = await supabase
-                .from('chat_messages')
-                .select('*')
-                .eq('session_id', sessionId)
-                .order('created_at', { ascending: true });
-
-            const historyContainer = document.getElementById('chat-history');
-            historyContainer.innerHTML = '';
-
-            if (error) {
-                console.error('Error loading messages:', error);
-                return;
-            }
-
-            data.forEach(msg => {
-                addMessageToUI(msg.role === 'user' ? 'user' : 'assistant', msg.content);
+            // 2. Create Instance
+            const term = new Terminal({
+                cursorBlink: true,
+                theme: { background: '#000000', foreground: '#f0f0f0' },
+                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                fontSize: 14
             });
-            scrollToBottom();
-        }
+            const fitAddon = new FitAddon.FitAddon();
+            term.loadAddon(fitAddon);
 
-        async function deleteChat(sessionId, event) {
-            event.stopPropagation();
-            if (!confirm("Delete this chat?")) return;
+            // BUG FIX: Open in the specific container, NOT 'terminal-container'
+            term.open(container);
 
-            const { error } = await supabase.from('chat_sessions').delete().eq('id', sessionId);
-            if (error) {
-                alert("Error deleting chat");
-            } else {
-                if (currentSessionId === sessionId) {
-                    startNewChat();
-                }
-                await loadChatHistoryList();
-            }
-        }
+            // 3. Connect WS
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${protocol}//${window.location.host}/ws/terminal`);
 
-        async function createSessionIfNeeded(firstMessage) {
-            if (!currentSessionId) {
-                const { data: { user } } = await supabase.auth.getUser();
-                const title = firstMessage.substring(0, 30) + (firstMessage.length > 30 ? '...' : '');
-
-                const { data, error } = await supabase
-                    .from('chat_sessions')
-                    .insert({ user_id: user.id, title: title })
-                    .select()
-                    .single();
-
-                if (error) {
-                    console.error('Error creating session:', error);
-                    return null;
-                }
-                currentSessionId = data.id;
-                document.getElementById('current-chat-title').textContent = title;
-                loadChatHistoryList(); // Refresh list to show new chat
-            }
-            return currentSessionId;
-        }
-
-        async function saveMessage(role, content) {
-            if (!currentSessionId) return;
-            await supabase.from('chat_messages').insert({
-                session_id: currentSessionId,
-                role: role,
-                content: content
-            });
-        }
-
-        function handleEnter(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        }
-
-        async function sendMessage() {
-            const input = document.getElementById('chat-input');
-            const message = input.value.trim();
-            if (!message) return;
-
-            // 1. UI update
-            input.value = '';
-            addMessageToUI('user', message);
-            scrollToBottom();
-
-            // 2. Ensure Session Exists & Save User Message
-            await createSessionIfNeeded(message);
-            saveMessage('user', message);
-
-            // 3. Prepare implementation
-            const apiKey = document.getElementById('chat-api-key').value;
-            const baseUrl = document.getElementById('chat-base-url').value;
-            const model = document.getElementById('chat-model').value;
-
-            // Construct history for API (could optimize to only send recent context)
-            // For now, let's grab the visible history or just send the new message if we want to be stateless
-            // Ideally we should re-construct the conversation from the UI or DB.
-            // Simplification: Send last 10 messages from UI
-            const messages = [];
-            document.querySelectorAll('.chat-message').forEach(el => {
-                const isUser = el.classList.contains('user-message');
-                // We need to get the raw text, but markdown renders HTML. 
-                // We can store logical history in a variable if needed, or just use innerText
-                messages.push({ role: isUser ? 'user' : 'assistant', content: el.getAttribute('data-raw') || el.innerText });
-            });
-
-            const aiMsgEl = addMessageToUI('assistant', '...');
-            let aiContent = '';
-
-            try {
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        messages: messages,
-                        apiKey: apiKey || undefined,
-                        baseUrl: baseUrl || undefined,
-                        model: model
-                    })
-                });
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                aiMsgEl.innerHTML = ''; // Clear loading dots
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    const text = decoder.decode(value);
-                    aiContent += text;
-                    // Render markdown incrementally? No, usually safer to render at end or periodic. 
-                    // But for streaming effect we prefer raw text or simple append.
-                    // Let's render Markdown at the end to avoid flickering, or use a streaming markdown parser.
-                    // For now: update text content then render at end.
-                    aiMsgEl.innerText = aiContent;
-                    scrollToBottom();
-                }
-
-                // Final render
-                aiMsgEl.innerHTML = marked.parse(aiContent);
-                aiMsgEl.setAttribute('data-raw', aiContent);
-
-                // Save AI Message
-                saveMessage('assistant', aiContent);
-
-            } catch (error) {
-                aiMsgEl.textContent = "Error: " + error.message;
-            }
-        }
-
-        function addMessageToUI(role, content) {
-            const div = document.createElement('div');
-            // Use tailwind typography for markdown (prose)
-            div.className = `chat-message ${role === 'user' ? 'user-message bg-blue-600' : 'ai-message bg-gray-700'} max-w-[80%] p-3 rounded-lg my-2 prose prose-invert break-words`;
-
-            if (role === 'user') {
-                div.classList.add('self-end');
-                div.innerText = content; // User input is text, no markdown usually? Or yes? user wants markdown rendering too?
-                div.innerHTML = marked.parse(content);
-            } else {
-                div.classList.add('self-start');
-                div.innerHTML = marked.parse(content);
-            }
-
-            div.setAttribute('data-raw', content);
-            document.getElementById('chat-history').appendChild(div);
-            return div;
-        }
-
-        function scrollToBottom() {
-            const historyContainer = document.getElementById('chat-history');
-            historyContainer.scrollTop = historyContainer.scrollHeight;
-        }
-
-        async function fetchModels() {
-            const apiKey = document.getElementById('chat-api-key').value;
-            const baseUrl = document.getElementById('chat-base-url').value;
-
-            if (!baseUrl) {
-                alert("Please enter a Base URL");
-                return;
-            }
-
-            const btn = document.querySelector('button[onclick="fetchModels()"]');
-            const originalText = btn.innerText;
-            btn.innerText = "Loading...";
-            btn.disabled = true;
-
-            try {
-                const res = await fetch('/api/proxy/models', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ apiKey, baseUrl })
-                });
-
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.detail || "Failed to fetch");
-                }
-
-                const data = await res.json();
-                const datalist = document.getElementById('model-list'); // Changed from model-list-suggestions
-                datalist.innerHTML = '';
-
-                // Handle common OpenAI format { data: [{id: ...}, ...] }
-                const models = data.data || data;
-                if (Array.isArray(models)) {
-                    models.forEach(m => {
-                        const option = document.createElement('option');
-                        option.value = m.id || m;
-                        datalist.appendChild(option);
-                    });
-                    alert(`Fetched ${models.length} models! Click the Model input to see them.`);
-                } else {
-                    alert("Unknown response format: " + JSON.stringify(data).substring(0, 100));
-                }
-
-            } catch (e) {
-                alert("Error: " + e.message);
-            } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
-            }
-        }
-
-        // --- Provider Management (LocalStorage) ---
-        function loadProviders() {
-            const select = document.getElementById('saved-providers');
-            const currentSelection = select.value;
-            select.innerHTML = '<option value="">Select a provider...</option>';
-
-            const providers = JSON.parse(localStorage.getItem('chat_providers') || '{}');
-            Object.keys(providers).sort().forEach(name => {
-                const option = document.createElement('option');
-                option.value = name;
-                option.textContent = name;
-                select.appendChild(option);
-            });
-
-            if (providers[currentSelection]) {
-                select.value = currentSelection;
-            }
-        }
-
-        function saveProvider() {
-            const name = prompt("Enter a name for this provider configuration:");
-            if (!name) return;
-
-            const config = {
-                apiKey: document.getElementById('chat-api-key').value,
-                baseUrl: document.getElementById('chat-base-url').value,
-                model: document.getElementById('chat-model').value
+            ws.onopen = () => {
+                term.write('\r\n\x1b[32mWelcome to Terminal ' + terminalCount + '\x1b[0m\r\n');
+                const cols = term.cols;
+                const rows = term.rows;
+                ws.send(`\x01resize:${cols}:${rows}`);
+                fitAddon.fit();
             };
+            ws.onmessage = e => term.write(e.data);
+            term.onData(d => ws.send(d));
+            term.onResize(size => {
+                if (ws.readyState === WebSocket.OPEN) ws.send(`\x01resize:${size.cols}:${size.rows}`);
+            });
 
-            const providers = JSON.parse(localStorage.getItem('chat_providers') || '{}');
-            providers[name] = config;
-            localStorage.setItem('chat_providers', JSON.stringify(providers));
-            loadProviders();
-            document.getElementById('saved-providers').value = name;
+            // 4. Store
+            terminals[id] = { term, fitAddon, ws, id };
+
+            // 5. Add Tab UI
+            const tabBtn = document.createElement('div');
+            tabBtn.id = 'tab-btn-' + id;
+            tabBtn.className = 'group flex items-center px-4 py-2 bg-gray-900 border-r border-gray-700 hover:bg-gray-700 cursor-pointer min-w-[120px] justify-between';
+            tabBtn.innerHTML = `
+                <span class="text-xs font-mono text-gray-300 truncate mr-2" onclick="activateTerminalTab('${id}')">Term ${terminalCount}</span>
+                <span class="text-gray-500 hover:text-red-500 font-bold text-xs p-1 rounded" onclick="closeTerminalTab('${id}', event)">×</span>
+            `;
+            document.getElementById('terminal-tabs').appendChild(tabBtn);
+
+            // 6. Activate
+            activateTerminalTab(id);
         }
 
-        function loadSelectedProvider(name) {
-            if (!name) return;
-            const providers = JSON.parse(localStorage.getItem('chat_providers') || '{}');
-            const config = providers[name];
-            if (config) {
-                document.getElementById('chat-api-key').value = config.apiKey || '';
-                document.getElementById('chat-base-url').value = config.baseUrl || '';
-                document.getElementById('chat-model').value = config.model || '';
+        function activateTerminalTab(id) {
+            Object.values(terminals).forEach(t => {
+                document.getElementById(t.id).classList.add('hidden');
+                document.getElementById('tab-btn-' + t.id).classList.remove('bg-gray-800', 'border-b-2', 'border-blue-500');
+                document.getElementById('tab-btn-' + t.id).classList.add('bg-gray-900');
+            });
+
+            activeTerminalId = id;
+            document.getElementById(id).classList.remove('hidden');
+            const tab = document.getElementById('tab-btn-' + id);
+            tab.classList.remove('bg-gray-900');
+            tab.classList.add('bg-gray-800', 'border-b-2', 'border-blue-500');
+
+            setTimeout(() => {
+                fitTerm(id);
+                terminals[id].term.focus();
+            }, 50);
+        }
+
+        function closeTerminalTab(id, event) {
+            if (event) event.stopPropagation();
+            if (Object.keys(terminals).length === 1) {
+                alert("Cannot close the last terminal.");
+                return;
+            }
+
+            const t = terminals[id];
+            t.ws.close();
+            t.term.dispose();
+            document.getElementById(id).remove();
+            document.getElementById('tab-btn-' + id).remove();
+            delete terminals[id];
+
+            if (activeTerminalId === id) {
+                const remaining = Object.keys(terminals);
+                if (remaining.length > 0) activateTerminalTab(remaining[remaining.length - 1]);
             }
         }
 
-        function deleteProvider() {
-            const select = document.getElementById('saved-providers');
-            const name = select.value;
-            if (!name) return;
+        function fitTerm(id) {
+            if (terminals[id]) {
+                const { fitAddon, term, ws } = terminals[id];
+                try {
+                    fitAddon.fit();
+                    const cols = term.cols;
+                    const rows = term.rows;
+                    if (ws.readyState === WebSocket.OPEN) ws.send(`\x01resize:${cols}:${rows}`);
+                } catch (e) { console.log("Fit error:", e); }
+            }
+        }
 
-            if (confirm(`Delete provider "${name}"?`)) {
-                const providers = JSON.parse(localStorage.getItem('chat_providers') || '{}');
-                delete providers[name];
-                localStorage.setItem('chat_providers', JSON.stringify(providers));
-                loadProviders();
-                document.getElementById('chat-api-key').value = '';
-                document.getElementById('chat-base-url').value = '';
-                document.getElementById('chat-model').value = '';
+        window.addEventListener('resize', () => {
+            if (activeTerminalId && !document.getElementById('terminal-view').classList.contains('hidden')) {
+                fitTerm(activeTerminalId);
+            }
+        });
+
+        // --- Chat Logic ---
+        const providers = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+        delete providers[name];
+        localStorage.setItem('chat_providers', JSON.stringify(providers));
+        loadProviders();
+        document.getElementById('chat-api-key').value = '';
+        document.getElementById('chat-base-url').value = '';
+        document.getElementById('chat-model').value = '';
             }
         }
 

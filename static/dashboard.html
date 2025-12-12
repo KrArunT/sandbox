@@ -7,24 +7,109 @@
     <title>Dashboard - Sandbox</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+    <style>
+        .xterm-viewport {
+            overflow-y: hidden !important;
+        }
+
+        .chat-message {
+            max-width: 80%;
+            padding: 10px;
+            margin: 5px;
+            border-radius: 10px;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background-color: #3b82f6;
+            align-self: flex-end;
+            color: white;
+        }
+
+        .ai-message {
+            background-color: #374151;
+            align-self: flex-start;
+            color: white;
+        }
+    </style>
 </head>
 
-<body class="bg-gray-900 text-white min-h-screen">
-    <nav class="bg-gray-800 p-4">
+<body class="bg-gray-900 text-white min-h-screen flex flex-col">
+    <nav class="bg-gray-800 p-4 shrink-0">
         <div class="container mx-auto flex justify-between items-center">
             <div class="text-xl font-bold text-blue-500">Sandbox App</div>
+            <div class="flex space-x-4">
+                <button onclick="switchMode('dashboard')" class="text-gray-300 hover:text-white">Dashboard</button>
+                <button onclick="switchMode('chat')" class="text-gray-300 hover:text-white">AI Chat</button>
+                <button onclick="switchMode('terminal')" class="text-gray-300 hover:text-white">Terminal</button>
+            </div>
             <button id="logout-btn" class="px-4 py-2 bg-red-600 rounded hover:bg-red-700">Logout</button>
         </div>
     </nav>
 
-    <div class="container mx-auto mt-10 p-4">
-        <h1 class="text-3xl font-bold mb-4">Welcome to the Dashboard</h1>
-        <p class="text-gray-400">This page is protected. Only authenticated users can see this.</p>
-        <!-- Blank page content here -->
+    <div class="container mx-auto mt-4 p-4 flex-grow flex flex-col h-[calc(100vh-80px)] overflow-hidden">
+
+        <!-- Dashboard View -->
+        <div id="dashboard-view" class="view-section">
+            <h1 class="text-3xl font-bold mb-4">Welcome to the Dashboard</h1>
+            <p class="text-gray-400">Select AI Chat or Terminal from the navigation bar.</p>
+        </div>
+
+        <!-- Chat View -->
+        <div id="chat-view" class="view-section hidden flex flex-col h-full">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">AI Chat</h2>
+                <button onclick="document.getElementById('chat-settings').classList.toggle('hidden')"
+                    class="text-sm bg-gray-700 px-3 py-1 rounded">Settings</button>
+            </div>
+
+            <div id="chat-settings" class="hidden bg-gray-800 p-4 rounded mb-4 border border-gray-700">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm mb-1">API Key</label>
+                        <input type="password" id="chat-api-key" placeholder="sk-..."
+                            class="w-full bg-gray-700 p-2 rounded border border-gray-600">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1">Base URL</label>
+                        <input type="text" id="chat-base-url" placeholder="https://api.openai.com/v1"
+                            class="w-full bg-gray-700 p-2 rounded border border-gray-600">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1">Model</label>
+                        <input type="text" id="chat-model" value="gpt-3.5-turbo"
+                            class="w-full bg-gray-700 p-2 rounded border border-gray-600">
+                    </div>
+                </div>
+            </div>
+
+            <div id="chat-history"
+                class="flex-grow bg-gray-800 rounded p-4 mb-4 overflow-y-auto flex flex-col space-y-2">
+                <!-- Messages go here -->
+            </div>
+
+            <div class="flex space-x-2">
+                <input type="text" id="chat-input" class="flex-grow bg-gray-700 p-2 rounded border border-gray-600"
+                    placeholder="Type a message...">
+                <button onclick="sendMessage()" class="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700">Send</button>
+            </div>
+        </div>
+
+        <!-- Terminal View -->
+        <div id="terminal-view" class="view-section hidden h-full bg-black rounded p-2 overflow-hidden">
+            <div id="terminal-container" class="w-full h-full"></div>
+        </div>
+
     </div>
 
     <script>
         let supabase;
+        let term;
+        let fitAddon;
+        let ws;
 
         async function init() {
             try {
@@ -45,10 +130,135 @@
                     window.location.href = '/';
                 });
 
+                // Init Terminal on first switch
+                // initTerminal(); - called in switchMode
+
             } catch (error) {
                 console.error('Error:', error);
-                window.location.href = '/';
+                // window.location.href = '/'; 
             }
+        }
+
+        // View Switching
+        function switchMode(mode) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(mode + '-view').classList.remove('hidden');
+
+            if (mode === 'terminal') {
+                if (!term) initTerminal();
+                setTimeout(() => fitAddon && fitAddon.fit(), 100);
+            }
+        }
+
+        // --- Chat Logic ---
+        const chatHistory = [];
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            // Add user message
+            addMessageToUI('user', message);
+            chatHistory.push({ role: 'user', content: message });
+            input.value = '';
+
+            const apiKey = document.getElementById('chat-api-key').value;
+            const baseUrl = document.getElementById('chat-base-url').value;
+            const model = document.getElementById('chat-model').value;
+
+            // Prepare AI message bubble
+            const aiMsgEl = addMessageToUI('assistant', '...');
+            let aiContent = '';
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: chatHistory,
+                        apiKey: apiKey || undefined,
+                        baseUrl: baseUrl || undefined,
+                        model: model
+                    })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                aiMsgEl.textContent = ''; // Clear loading dots
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const text = decoder.decode(value);
+                    aiContent += text;
+                    aiMsgEl.textContent = aiContent;
+                    // Auto scroll
+                    const historyContainer = document.getElementById('chat-history');
+                    historyContainer.scrollTop = historyContainer.scrollHeight;
+                }
+                chatHistory.push({ role: 'assistant', content: aiContent });
+
+            } catch (error) {
+                aiMsgEl.textContent = "Error: " + error.message;
+            }
+        }
+
+        function addMessageToUI(role, content) {
+            const div = document.createElement('div');
+            div.className = `chat-message ${role === 'user' ? 'user-message' : 'ai-message'}`;
+            div.textContent = content;
+            document.getElementById('chat-history').appendChild(div);
+            return div;
+        }
+
+        document.getElementById('chat-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // --- Terminal Logic ---
+        function initTerminal() {
+            if (term) return;
+
+            term = new Terminal({
+                cursorBlink: true,
+                theme: { background: '#000000' }
+            });
+            fitAddon = new FitAddon.FitAddon();
+            term.loadAddon(fitAddon);
+            term.open(document.getElementById('terminal-container'));
+            fitAddon.fit();
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws/terminal`);
+
+            ws.onopen = () => {
+                term.write('\r\nConnected to backend terminal...\r\n');
+
+                // Send explicit resize
+                const cols = term.cols;
+                const rows = term.rows;
+                ws.send(`\x01resize:${cols}:${rows}`);
+            };
+
+            ws.onmessage = (event) => {
+                term.write(event.data);
+            };
+
+            term.onData(data => {
+                ws.send(data);
+            });
+
+            term.onResize(size => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(`\x01resize:${size.cols}:${size.rows}`);
+                }
+            });
+
+            window.addEventListener('resize', () => {
+                fitAddon.fit();
+            });
         }
 
         init();

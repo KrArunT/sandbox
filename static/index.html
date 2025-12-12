@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,25 +8,32 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
+
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
     <div class="w-full max-w-md p-8 space-y-6 bg-gray-800 rounded-lg shadow-lg">
         <h1 class="text-3xl font-bold text-center text-blue-500">Sandbox Login</h1>
-        
+
         <div id="alert" class="hidden p-4 mb-4 text-sm text-red-500 bg-gray-700 rounded-lg" role="alert"></div>
 
         <form id="auth-form" class="space-y-4">
             <div>
                 <label for="email" class="block mb-2 text-sm font-medium">Email</label>
-                <input type="email" id="email" class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
+                <input type="email" id="email"
+                    class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    required>
             </div>
             <div>
                 <label for="password" class="block mb-2 text-sm font-medium">Password</label>
-                <input type="password" id="password" class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
+                <input type="password" id="password"
+                    class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    required>
             </div>
-            
+
             <div class="flex space-x-4">
-                <button type="submit" id="login-btn" class="w-full px-5 py-2.5 text-sm font-medium bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-800">Login</button>
-                <button type="button" id="register-btn" class="w-full px-5 py-2.5 text-sm font-medium bg-green-600 rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-800">Register</button>
+                <button type="submit" id="login-btn"
+                    class="w-full px-5 py-2.5 text-sm font-medium bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-800">Login</button>
+                <button type="button" id="register-btn"
+                    class="w-full px-5 py-2.5 text-sm font-medium bg-green-600 rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-800">Register</button>
             </div>
         </form>
     </div>
@@ -41,7 +49,7 @@
                     throw new Error('Supabase configuration missing');
                 }
                 supabase = window.supabase.createClient(config.supabase_url, config.supabase_key);
-                
+
                 // Check if already logged in
                 const { data: { session } } = await supabase.auth.getSession();
                 if (session) {
@@ -86,7 +94,12 @@
                 if (result.error) throw result.error;
 
                 if (type === 'register') {
-                    showAlert('Registration successful! Please check your email to verify (if enabled) or try logging in.', 'success');
+                    if (result.data && result.data.session) {
+                        // Email verification is disabled, user is logged in
+                        window.location.href = '/static/dashboard.html';
+                    } else {
+                        showAlert('Registration successful! Please check your email to verify (if enabled) or try logging in.', 'success');
+                    }
                 } else {
                     window.location.href = '/static/dashboard.html';
                 }
@@ -107,4 +120,5 @@
         initSupabase();
     </script>
 </body>
+
 </html>
